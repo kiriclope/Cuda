@@ -269,6 +269,14 @@ int main(int argc, char *argv[]) {
       printf("  Copy dev to Host ... ") ;
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
       printf(" Done\n") ;
+
+      printf("Check conVec \n") ;
+      for(int k=0;k<maxNeurons;k++)
+      	for(int j=0;j<N_NEURONS;j++)
+      	  if(conVec[k+j*maxNeurons]==0) {
+      	    printf("ERROR row %d clm %d conVec %.3f \n", k, j, conVec[k+j*N_NEURONS]) ;
+	    exit(-1) ;
+	  }
       
       for(unsigned long long int j = 0; j < chunckSize ; j++) {
 	fullConVec[j + chunckSize * i] = conVec[j] ; 
