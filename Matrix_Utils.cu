@@ -183,4 +183,27 @@ __host__ void WriteMatrix(char *path, int N, int *IdPost, int *nbPost, unsigned 
   free(M) ;
 }
 
+__global__ void GenSparseRep(float *dev_conVec, float *dev_IdPost, float *dev_nbPost, int lChunk, int maxNeurons) {
+
+  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x; // each clm is a thread
+  unsigned long int kNeuron = id + lChunck * maxNeurons;
+  unsigned long int i;
+  int nbPost, counter ;
+
+  for(i=0;i<N_NEURONS;i++) {
+
+    nbPost = 0 ;
+    counter = 0 ;
+
+    if(dev_ConVec[i + id * N_NEURONS]) { // id-->i column to row
+      IdPost[counter] = i ;
+      nbPreSab[j][i]++ ;
+      counter+=1 ;
+    }
+
+    dev_nbPost[i] += nbPost ;
+
+  }
+}
+
 #endif

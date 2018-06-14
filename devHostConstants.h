@@ -2,7 +2,7 @@
 #define _NEURON_COUNTS
 
 #define nbpop 2
-#define N_NEURONS 8000ULL
+#define N_NEURONS 80000ULL
 #define popSize .5
 
 #define K 250.
