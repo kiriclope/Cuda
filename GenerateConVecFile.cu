@@ -197,11 +197,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* choose 256 threads per block for high occupancy */
-  int ThreadsPerBlock = 256;
-  printf("ThreadsPerBlock %d, ",ThreadsPerBlock) ;
-  
+  int ThreadsPerBlock = 256;  
   int BlocksPerGrid = ( N_NEURONS + ThreadsPerBlock-1 ) / ThreadsPerBlock;
-  printf("BlocksPerGrid %d \n",BlocksPerGrid) ;
   
   if(BlocksPerGrid > 65536) {
     printf("BlocksPerGrid exceds valid number of allowed blocks of 65536");
@@ -254,126 +251,81 @@ int main(int argc, char *argv[]) {
       printf("%.4f ",Sigma[j]) ;
     printf("\n") ;
   }
-  
-  initPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_preFactor);
-  
-  for(unsigned long long int i = 0; i < nChunks; i++) { 
-
-    initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
-
-    printf("Generating chunk %llu ... ", i); fflush(stdout);
+            
+  switch(conMatType) {
     
-    switch(conMatType) {
-      
-    case random:
-      printf("\n Generating Random Matrix ... \n");
-      kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN);
-      
-      printf("  Copy conVec to Host ... ") ;
-      cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
-      printf(" Done\n") ;
+  case random:
     
-      break;
-      
-    case distDependent:
-      KernelGenConProbMat<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma);
-      
-      printf("  Copy conVec to Host ... ") ;
-      cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
-      printf(" Done\n") ;
-
-      printf("Check conVec \n") ;
-      for(int k=0;k<N_NEURONS;k++)
-      	for(int j=0;j<maxNeurons;j++)
-      	  if(conVec[k+j*maxNeurons]==0) {
-      	    printf("ERROR row %d clm %d conVec %.3f \n", k, j, conVec[k+j*maxNeurons]) ;
-	    exit(-1) ;
-	  }
-
-      KernelConProbPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;
-      
-      break;
-      
-    default:
-      kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN);
-    }
-    
-    printf("   Generating fullConVec  ... ") ; 
-    for(unsigned long long int j = 0; j < chunckSize ; j++) {
-      fullConVec[j + chunckSize * i] = conVec[j] ; 
-      // if(conVec[j]!=1) {
-      // 	printf("\n ERRROR Chunk %llu conVec [%llu] = %.3f \n", i, j, conVec[j] ) ;
-      // 	exit(-1) ;
-      // }      
-      conVec[j] = 0 ;
-    }
-    printf(" Done\n") ; 
-  }
-
-  if(IF_SPACE) { 
-    printf("Generating preFactor ...") ; 
-    
-    for(unsigned long int i=0;i<=2*N_NEURONS;i++)
-      preFactor[i] = 0 ;
-
-    printf(" Copy preFactor to Host ...") ; 
-    cudaCheck(cudaMemcpy(preFactor, dev_preFactor, 2 * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ; 
-    printf(" Done\n ") ; 
-
-    // printf("Check preFactor ...\n") ; 
-    // for(int j=0;j<2*N_NEURONS;j++)
-    //   if(preFactor[j]!=N_NEURONS/nbpop)
-    // 	printf("ERROR clm %d prefactor %.3f \n", j, preFactor[j]) ;
-
-    printf("  Generating normConVec  ..."); 
-    for(unsigned long long int i = 0; i < N_NEURONS; i++) 
-      for(unsigned long long int j = 0; j < N_NEURONS; j++) {
-    	fullConVec[i + j * N_NEURONS] *= (float) K / (float) preFactor[j + whichPop(i) * N_NEURONS] ; 
-	// fullConVec[i + j * N_NEURONS] *= (float) preFactor[j + whichPop(i) * N_NEURONS ] ; 
-	// if( fullConVec[i + j * N_NEURONS] != preFactor[ j + whichPop(i) * N_NEURONS ] ) 
-	//   printf("ERROR conVec row %d clm %d conVec %.3f preFactor %.3f\n", i, j, fullConVec[ i + j * N_NEURONS], preFactor[i + whichPop(j) * N_NEURONS ]) ;
-      }
-    printf(" Done\n ") ; 
-
     for(unsigned long long int i = 0; i < nChunks; i++) { 
-
+      
+      printf("Generating chunk %llu ... ", i) ; fflush(stdout) ;
+      
       initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
-      
-      printf("   Normalize conVec ...") ;
-      for(unsigned long long int j = 0; j < chunckSize ; j++) {
-	conVec[j] = fullConVec[ j + chunckSize * i] ;
-	// if(conVec[j]!=N_NEURONS/nbpop) {
-	//   printf("\n ERRROR Chunk %llu conVec [%llu] = %.3f \n", i, j, conVec[j] ) ;
-	//   exit(-1) ;
-	// }
-      }
-      printf(" Done\n ") ; 
-      
-      printf("     Copy normConVec to dev ...") ; 
-      cudaCheck(cudaMemcpy(dev_conVecPtr, conVec, ( N_NEURONS / nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyHostToDevice)) ; 
-      printf(" Done\n ") ; 
-      
-      printf("      Generating Random Matrix ...");
-      KernelGenDistDepConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons) ; 
-      printf(" Done\n ") ; 
 
-      printf("       Copy normConVec to Host ...") ;
+      printf("\n Generating Binary Matrix ...") ;
+      kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN); 
+      printf(" Done\n") ; 
+
+      printf("  Copy dev to Host ... ") ;
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
       printf(" Done\n") ;
-
-      printf("        Generating binary matrix  ...") ; 
+      
       for(unsigned long long int j = 0; j < chunckSize ; j++) {
-	// if(conVec[j]!=1) {
-	//   printf("\n ERRROR Chunk %llu conVec [%llu] = %.3f \n", i, j, conVec[j] ) ;
-	//   exit(-1) ;
-	// }
 	fullConVec[j + chunckSize * i] = conVec[j] ; 
 	conVec[j] = 0 ;
       }
+    }
+    
+    break;
+      
+  case distDependent:
+      
+    initPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_preFactor);
+    
+    for(unsigned long long int i = 0; i < nChunks; i++) { 
+      
+      printf("Generating chunk %llu ... ", i); fflush(stdout);
+	
+      printf("\n Generating Probabilty Matrix ...");
+      KernelGenConProbMat<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma);      
+      printf(" Done\n") ; 
+      
+      printf("  Generating preFactor ...");
+      KernelConProbPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;
       printf(" Done\n") ; 
       
     }
     
+    for(unsigned long long int i = 0; i < nChunks; i++) { 
+
+      printf("Generating chunk %llu ... ", i); fflush(stdout);
+      
+      initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
+      
+      printf("\n Generating Normalized Matrix ...") ;
+      KernelConProbNorm<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;
+      printf(" Done\n") ; 
+            
+      printf("  Generating Binary Matrix ...") ;
+      KernelGenDistDepConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons) ; 
+      printf(" Done\n") ; 
+
+      printf("   Copy dev to Host ...") ;
+      cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
+      printf(" Done\n") ; 
+      
+      for(unsigned long long int j = 0; j < chunckSize ; j++) {
+	fullConVec[j + chunckSize * i] = conVec[j] ; 
+	conVec[j] = 0 ;
+      }
+
+    }
+
+    break;    
+    
+  default:
+    for(unsigned long long int i = 0; i < nChunks; i++) 
+      kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN);
   }
   
   printf("Free devPtr ... ");

@@ -8,7 +8,7 @@
 #define K 250.
 #define L 2.0*M_PI
 
-#define IF_CHUNKS 1
+#define IF_CHUNKS 0
 #define NCHUNKS 2
 #define MAXNEURONS 2500ULL
 
