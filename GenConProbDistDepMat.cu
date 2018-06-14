@@ -1,0 +1,96 @@
+#ifndef _CONNECTION_PROB_
+#define _CONNECTION_PROB_
+#include <stdio.h>
+#include <cuda.h>
+#include "devHostConstants.h"
+
+/* GENERATE CONNECTION MATRIX */
+
+__device__ double XCordinate(unsigned long int neuronIdx, int *nbN, int *Cpt) { 
+  double X = 0 ;
+  int i = whichPop(neuronIdx) ;
+
+  X = fmod( (double) (neuronIdx-Cpt[i]), (double) nbN[i] ) * L / ( (double) nbN[i] - 1.0 )  ;
+
+  return X ;
+}
+
+///////////////////////////////////////////////////////////////////    
+
+__device__ double Gaussian1D(double mu, double sigma) {
+  return exp(-mu*mu/2./sigma/sigma)/sqrt(2.*M_PI)/sigma ;
+}
+
+///////////////////////////////////////////////////////////////////    
+
+__device__ double ShortestDistOnCirc(double point0, double point1, double perimeter) {
+  double dist = 0.0;
+  dist = abs(point0 - point1);
+  dist = fmod(dist, perimeter);
+  if(dist > 0.5*L){
+    dist = L*(1.0 - dist);
+  }
+  return dist;
+}
+
+///////////////////////////////////////////////////////////////////    
+
+__device__ double ConProb(double xa, double xb, double patchSize, double varianceOfGaussian) {
+  double distX = 0.0; //ShortestDistOnCirc(xa, xb, patchSize);
+  int IF_PERIODIC = 1;
+  if(IF_PERIODIC)
+    distX = ShortestDistOnCirc(xa, xb, patchSize) ;
+  else 
+    distX = abs(xa - xb) ; 
+  return Gaussian1D(distX, varianceOfGaussian);
+}
+
+///////////////////////////////////////////////////////////////////    
+
+__global__ void KernelGenConProbMat(float *dev_conVec, int lChunck, int maxNeurons, int *nbN, int *Cpt, const double *Sigma) {
+
+  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned long int kNeuron = id + lChunck * maxNeurons ;
+  unsigned long int i;
+  double xa;
+
+  if(id < maxNeurons & kNeuron < N_NEURONS) {    
+    xa = XCordinate(kNeuron,nbN,Cpt) ; // Mij column to row 
+    for(i=0; i < N_NEURONS; i++)  // i-->id column to row, P[row][clm] = G(X[row],X[clm],Sigma[clm]) 
+      dev_conVec[i + id * N_NEURONS ] = (float) ConProb(xa, XCordinate(i,nbN,Cpt), L, Sigma[whichPop(i)] ) ; 
+  }
+}
+///////////////////////////////////////////////////////////////////    
+
+__global__ void KernelConProbPreFactor(float *dev_conVec,float *dev_preFactor, int lChunck, int maxNeurons) {
+  /*  COMPUTE PRE-FACTOR AND MULTIPLY zB[clm] = K / sum(conProd(row, :)) */
+
+  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x; // each clm is a thread
+  unsigned long int kNeuron = id + lChunck * maxNeurons ;
+  unsigned long int i;
+  
+  if(id < maxNeurons & kNeuron < N_NEURONS) {// i-->id column to row 
+    for(i=0;i<N_NEURONS;i++) // sum over columns 
+      dev_preFactor[ kNeuron + whichPop(i) * N_NEURONS ] += (double) dev_conVec[ i + id * N_NEURONS] ; 
+  }
+}
+
+/////////////////////////////////////////////////////////////////// 
+
+// __global__ void KernelConProbNorm(float *dev_conVec, float *dev_preFactor, int lChunck, int maxNeurons) {
+  
+//   unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x; // each clm is a thread
+//   unsigned long int kNeuron = id + lChunck * maxNeurons;
+//   unsigned long int i;
+//   double preFactor = 0 ; 
+  
+//   if(id < maxNeurons & kNeuron< N_NEURONS) { 
+//     for(i=0;i<N_NEURONS;i++) { // id-->i column to row, P[row][clm] = Zb[row] * C[row][clm]
+//       // preFactor = K/dev_preFactor[kNeuron + whichPop(i) * (N_NEURONS-1)] ; 
+//       preFactor = dev_preFactor[i + whichPop(kNeuron) * N_NEURONS] ; 
+//       dev_conVec[kNeuron + i * maxNeurons] *= (float) preFactor ; 
+//     }
+//   }
+// }
+
+#endif

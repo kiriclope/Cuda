@@ -1,0 +1,137 @@
+#ifndef __MATRIXUTILS__
+#define __MATRIXUTILS__
+#include "devHostConstants.h"
+
+///////////////////////////////////////////////////////////////////    
+
+__host__ void Create_Path(int nbpop,char *path,int N,double K) {
+  
+  char *mkdirp ;   
+  char cdum[50] ;
+  sprintf(cdum, "../Connectivity/%dpop/N%d/K%d",nbpop,N,K) ;
+
+  path = (char *) malloc(strlen(cdum)) ;
+  strcpy(path,cdum) ;
+
+  mkdirp = (char *) malloc(strlen(path)+20);
+  
+  strcpy(mkdirp,"mkdir -p ") ;
+  strcat(mkdirp,path) ; 
+
+  const int dir_err = system(mkdirp);
+
+  if(-1 == dir_err) {
+    printf("error creating directories\n");
+  }
+  
+  printf("Created directory : ") ;
+  printf("%s\n",path) ;
+}
+
+///////////////////////////////////////////////////////////////////    
+
+__host__ void CheckPres(int nbpop, char *path, int* Nk, int **nbPreSab) {
+
+  const char * str ="/nbPreSab.txt" ;
+  char *strPreSab ;
+  strPreSab =  (char *) malloc(strlen(path)+strlen(str)) ;
+  strcpy(strPreSab,path) ;
+  strcat(strPreSab,str) ;
+
+  FILE * pFile;
+  pFile = fopen (strPreSab,"w");
+
+  printf("Average nbPreS : ");
+  for(int i=0;i<nbpop;i++) 
+    for(int j=0;j<nbpop;j++) { 
+      printf("%.3f ", nbPreSab[i][j]/(double)Nk[i]);
+      fprintf(pFile,"%.3f ", nbPreSab[i][j]/(double)Nk[i]);
+    }
+  printf("\n");
+
+  fclose(pFile);
+}
+///////////////////////////////////////////////////////////////////    
+
+__host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned long int *idxPost, bool IF_Nk) {
+
+  printf(" Writing to Files :\n") ;
+
+  char *nbpath  ;
+  char *idxpath ;
+  char  *Idpath ;
+
+  const char *strIdPost = "/nbPost.dat";
+  const char *stridxPost = "/idxPost.dat";
+  const char *strnbPost = "/IdPost.dat"; 
+
+  nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost)) ;
+  idxpath = (char *) malloc(strlen(path)+strlen(stridxPost)) ;
+  Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost)) ;
+
+  strcpy(nbpath,path) ;
+  strcpy(idxpath,path) ;
+  strcpy(Idpath,path) ;
+
+  strcat(nbpath,strnbPost) ;
+  strcat(idxpath,stridxPost) ;
+  strcat(Idpath,strIdPost) ;
+
+  FILE *fIdPost, *fnbPost, *fidxPost ;
+  
+  fIdPost = fopen(Idpath, "wb");
+  fwrite(&IdPost[0], sizeof IdPost[0] , IdPost.size() , fIdPost);
+  fclose(fIdPost);
+
+  printf("%s\n",Idpath) ;
+
+  for(int i=1;i<N;i++)
+    idxPost[i] = idxPost[i-1] + nbPost[i-1] ;
+
+  fidxPost = fopen(idxpath, "wb") ;
+  fwrite(&idxPost[0], sizeof idxPost[0] , idxPost.size() , fidxPost); 
+  fclose(fidxPost);
+
+  printf("%s\n",idxpath) ;
+
+  fnbPost = fopen(nbpath, "wb") ;
+  fwrite(&nbPost[0], sizeof nbPost[0] , nbPost.size() , fnbPost) ;
+  fclose(fnbPost);
+
+  printf("%s\n",nbpath) ;
+
+}
+
+__host__ void WriteMatrix(char *path, int N, int *IdPost, int *nbPost, unsigned long int *idxPost) {
+
+  printf("Writing Cij Matrix to : \n") ;
+  const char* strMatrix = "/Cij_Matrix.dat";
+  char *pathMatrix ;
+  pathMatrix = (char *) malloc(strlen(path)+strlen(strMatrix)) ;
+
+  strcpy(pathMatrix,path) ;
+  strcat(pathMatrix,strMatrix) ;
+
+  printf("%s\n",pathMatrix);
+  
+  FILE *Out;
+  Out = fopen(pathMatrix,"wb");
+  
+  int **M ;
+  M = new int*[N] ;
+  for(int i=0;i<N;i++) 
+    M[i] = new int[N]() ;
+  
+  for(int i=0;i<N;i++) 
+    for(int l=idxPost[i]; l<idxPost[i]+nbPost[i]; l++) 
+      M[IdPost[l]][i] = 1 ;
+  
+    int dum ;
+    for (int i=0; i<N; i++) 
+      dum = fwrite(M[i], sizeof M[i][0], N, Out) ;
+    
+    fclose(Out) ;
+    delete [] M ;
+}
+
+#endif
