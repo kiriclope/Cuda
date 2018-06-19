@@ -215,10 +215,10 @@ int main(int argc, char *argv[]) {
 
   curandState *devStates;
   
-  fullConVec = (float *) malloc((unsigned long long) N_NEURONS * N_NEURONS * sizeof(float));
+  fullConVec = (float *) malloc( (unsigned long long) N_NEURONS * N_NEURONS * sizeof(float)) ;
 
-  IdPost = (int *) malloc((unsigned long long)N_NEURONS * (2ULL + (unsigned long long)K + N_NEURONS) * sizeof(int));
-  nbPost = (int *) malloc((unsigned long long) N_NEURONS * sizeof(int));
+  IdPost = (int *) malloc( (unsigned long long) N_NEURONS * ( 2ULL + (unsigned long long) K + N_NEURONS ) * sizeof(int)) ;
+  nbPost = (int *) malloc( (unsigned long long) N_NEURONS * sizeof(int)) ;
 
   int **nbPreSab = (int **)malloc(nbpop * sizeof(int *) );
   for(int i=0; i<nbpop; i++)
@@ -506,7 +506,7 @@ int main(int argc, char *argv[]) {
 	    nbPost[k]++ ;
 	    nbPreSab[j][i]++ ;
   	    counter+=1 ;
-  	  }   
+  	  } 
       // printf("PresId %d, nPost %d \r",k,nbPost[k]);
     }
   

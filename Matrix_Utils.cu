@@ -111,9 +111,9 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
   char *idxpath ;
   char  *Idpath ;
 
-  const char *strIdPost = "/nbPost.dat";
+  const char *strIdPost = "/IdPost.dat";
   const char *stridxPost = "/idxPost.dat";
-  const char *strnbPost = "/IdPost.dat"; 
+  const char *strnbPost = "/nbPost.dat"; 
 
   nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
   idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
@@ -149,7 +149,7 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
     idxPost[i] = idxPost[i-1] + nbPost[i-1] ;
 
   for(int i=0;i<10;i++)
-    printf("%lu ",idxPost[i]);
+    printf("%lu ",idxPost[i]) ;
   printf("\n"); 
 
   fidxPost = fopen(idxpath, "wb") ;
@@ -199,9 +199,9 @@ __host__ void CheckSparseVec(char * path) {
   char *idxpath ;
   char  *Idpath ;
 
-  const char *strIdPost = "/nbPost.dat";
+  const char *strIdPost = "/IdPost.dat";
   const char *stridxPost = "/idxPost.dat";
-  const char *strnbPost = "/IdPost.dat"; 
+  const char *strnbPost = "/nbPost.dat"; 
 
   nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
   idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
