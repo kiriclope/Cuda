@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
   for(int i=0; i<nbpop; i++)
     for(int j=0;j<nbpop;j++)
       nbPreSab[i][j] = 0 ;
-    
+  
   ////////////////////////////////////////////////////////////////////    
 
   cudaCheck(cudaMalloc((void **)&devStates,  N_NEURONS * sizeof(curandState)));
@@ -490,6 +490,26 @@ int main(int argc, char *argv[]) {
     
   unsigned long int *idxPost = (unsigned long int *) malloc( N * sizeof(unsigned long int) ); // idx of the post neurons 
   idxPost[0] = 0 ;
+
+  printf("Generating vectors nbPost & IdPost ... ");
+
+  for(int i=0;i<nbpop;i++) 
+    for(int j=0;j<nbpop;j++) 
+      nbPreSab[j][i] = 0 ; 
+
+  for(int i=0;i<nbpop;i++) 
+    for(int k=Cpt[i];k<Cpt[i+1];k++) { //Presynaptic neurons
+      for(int j=0;j<nbpop;j++) 
+  	for(int l=Cpt[j];l<Cpt[j+1];l++) //Postsynaptic neurons
+  	  if(fullConVec[k + N_NEURONS * l]) { // k-->l column to row
+	    IdPost[counter] = l ;
+	    nbPost[k]++ ;
+	    nbPreSab[j][i]++ ;
+  	    counter+=1 ;
+  	  }   
+      // printf("PresId %d, nPost %d \r",k,nbPost[k]);
+    }
+  printf("Done\n") ;
   
   ///////////////////////////////////////////////////////////////////    
   // Average number of Presynaptic neurons
