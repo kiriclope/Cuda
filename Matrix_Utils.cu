@@ -127,10 +127,20 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
   strcat(idxpath,stridxPost) ;
   strcat(Idpath,strIdPost) ;
 
+  unsigned long int nbCon = 0;
+  for(int i = 0; i < N_NEURONS; i++) 
+    nbCon += nbPost[i];
+  
   FILE *fIdPost, *fnbPost, *fidxPost ;
   
+  printf("sizeof IdPost %ld \n",  nbCon) ;
+
+  for(int i=0;i<10;i++)
+    printf("%d ",IdPost[i]);
+  printf("\n"); 
+
   fIdPost = fopen(Idpath, "wb");
-  fwrite(IdPost, sizeof(*IdPost) ,  sizeof(IdPost) / sizeof(IdPost[0]) , fIdPost);
+  fwrite(IdPost, sizeof(*IdPost) , nbCon , fIdPost);
   fclose(fIdPost);
 
   printf("%s\n",Idpath) ;
@@ -138,14 +148,22 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
   for(int i=1;i<N;i++)
     idxPost[i] = idxPost[i-1] + nbPost[i-1] ;
 
+  for(int i=0;i<10;i++)
+    printf("%lu ",idxPost[i]);
+  printf("\n"); 
+
   fidxPost = fopen(idxpath, "wb") ;
-  fwrite(idxPost, sizeof(*idxPost) , sizeof(idxPost) / sizeof(idxPost[0]) , fidxPost); 
+  fwrite(idxPost, sizeof(*idxPost) , N_NEURONS , fidxPost); 
   fclose(fidxPost);
 
   printf("%s\n",idxpath) ;
 
+  for(int i=0;i<10;i++)
+    printf("%d ",nbPost[i]);
+  printf("\n"); 
+
   fnbPost = fopen(nbpath, "wb") ;
-  fwrite(nbPost, sizeof(*nbPost) , sizeof(nbPost) / sizeof(nbPost[0]) , fnbPost) ;
+  fwrite(nbPost, sizeof(*nbPost) , N_NEURONS , fnbPost) ;
   fclose(fnbPost);
 
   printf("%s\n",nbpath) ;
@@ -170,14 +188,62 @@ __host__ void WriteMatrix(char *path, float *conVec) {
   FILE *Out;
   Out = fopen(pathMatrix,"wb");
   
-  fwrite( conVec, sizeof(float), N_NEURONS * N_NEURONS , Out) ;
+  fwrite(conVec, sizeof(float), N_NEURONS * N_NEURONS , Out) ;
 
   fclose(Out) ;
 }
 
-__host__ void CheckSparseVec(char * path, int *IdPost, int *nbPost, unsigned long int *idxPost) {
+__host__ void CheckSparseVec(char * path) {
 
+  char *nbpath  ;
+  char *idxpath ;
+  char  *Idpath ;
 
+  const char *strIdPost = "/nbPost.dat";
+  const char *stridxPost = "/idxPost.dat";
+  const char *strnbPost = "/IdPost.dat"; 
+
+  nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
+  idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
+  Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost) + 100 ) ;
+  
+  strcpy(nbpath,path) ;
+  strcpy(idxpath,path) ;
+  strcpy(Idpath,path) ;
+
+  strcat(nbpath,strnbPost) ;
+  strcat(idxpath,stridxPost) ;
+  strcat(Idpath,strIdPost) ;
+
+  int *nbPost ;
+  unsigned long int *idxPost ;
+  int *IdPost ;
+
+  nbPost = new int [N_NEURONS] ;
+  idxPost = new unsigned long int [N_NEURONS] ;
+
+  FILE *fnbPost, *fidxPost, *fIdPost ;
+  
+  int dum ;
+  
+  fnbPost = fopen(nbpath, "rb") ;
+  dum = fread(&nbPost[0], sizeof nbPost[0], N_NEURONS , fnbPost);  
+  fclose(fnbPost);
+  
+  fidxPost = fopen(idxpath, "rb") ;
+  dum = fread(&idxPost[0], sizeof idxPost[0], N_NEURONS , fidxPost);
+  fclose(fidxPost);
+  
+  unsigned long int nbposttot = 0 ;
+  for(int j=0 ; j<N_NEURONS; j++)
+    nbposttot += nbPost[j] ;
+  
+  IdPost = new int [nbposttot] ;
+  
+  fIdPost = fopen(Idpath, "rb");
+  dum = fread(&IdPost[0], sizeof IdPost[0], nbposttot , fIdPost); 
+  fclose(fIdPost);
+  
   printf("Writing Cij Matrix to : \n") ;
   const char* strMatrix = "/Cij_Matrix.dat";
   char *pathMatrix ;
@@ -205,9 +271,10 @@ __host__ void CheckSparseVec(char * path, int *IdPost, int *nbPost, unsigned lon
   
   for (int i=0; i<N_NEURONS; i++) 
     fwrite(M[i], sizeof(M[i][0]), N_NEURONS, Out) ;
-    
-    fclose(Out) ;
-    delete [] M ;
+  
+  fclose(Out) ;
+  delete [] M ;
+
 }
 
 

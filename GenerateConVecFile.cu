@@ -220,9 +220,9 @@ int main(int argc, char *argv[]) {
   IdPost = (int *) malloc((unsigned long long)N_NEURONS * (2ULL + (unsigned long long)K + N_NEURONS) * sizeof(int));
   nbPost = (int *) malloc((unsigned long long) N_NEURONS * sizeof(int));
 
-  int **nbPreSab = (int **)malloc(nbpop * sizeof(int *));
+  int **nbPreSab = (int **)malloc(nbpop * sizeof(int *) );
   for(int i=0; i<nbpop; i++)
-    nbPreSab[i] = (int *) malloc(nbpop * sizeof(int));
+    nbPreSab[i] = (int *) malloc(nbpop * sizeof(int) );
 
   for(int i=0; i<nbpop; i++)
     for(int j=0;j<nbpop;j++)
@@ -287,8 +287,6 @@ int main(int argc, char *argv[]) {
       printf("%.4f ",Sigma[j]) ;
     printf("\n") ;
   }
-
-  int counter = 0 ;
 
   switch(conMatType) {
     
@@ -497,6 +495,8 @@ int main(int argc, char *argv[]) {
     for(int j=0;j<nbpop;j++) 
       nbPreSab[j][i] = 0 ; 
 
+  int counter = 0 ;
+  
   for(int i=0;i<nbpop;i++) 
     for(int k=Cpt[i];k<Cpt[i+1];k++) { //Presynaptic neurons
       for(int j=0;j<nbpop;j++) 
@@ -509,7 +509,6 @@ int main(int argc, char *argv[]) {
   	  }   
       // printf("PresId %d, nPost %d \r",k,nbPost[k]);
     }
-  printf("Done\n") ;
   
   ///////////////////////////////////////////////////////////////////    
   // Average number of Presynaptic neurons
@@ -526,12 +525,13 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////////////////////
 
   WritetoFile(path,N,IdPost,nbPost,idxPost) ;
-  CheckSparseVec(path,IdPost,nbPost,idxPost) ;
 
   free(IdPost);
   free(idxPost);
   free(nbPost);
 
+  CheckSparseVec(path) ;
+ 
   ///////////////////////////////////////////////////////////////////    
   // Writing Complete Matrix
   ///////////////////////////////////////////////////////////////////

@@ -2,7 +2,7 @@
 #define _NEURON_COUNTS
 
 #define nbpop 2
-#define N_NEURONS 2000ULL
+#define N_NEURONS 20000ULL
 #define popSize .5
 
 #define K 250.
@@ -16,7 +16,7 @@ const double Sigma[4] = {.5,0,.0625,.0625} ;
 
 #define IF_Nk 0
 #define IF_SPACE 0
-#define IF_BUMP 1
+#define IF_BUMP 0
 #define IF_MATRIX 0
 
 #endif
