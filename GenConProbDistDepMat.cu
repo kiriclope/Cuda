@@ -47,6 +47,27 @@ __device__ double ConProb(double xa, double xb, double patchSize, double varianc
 
 ///////////////////////////////////////////////////////////////////    
 
+__global__ void KernelGenConRing(float *dev_conVec, int lChunck, int maxNeurons, int *nbN, int *Cpt, const double *Sigma) {
+
+  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned long int kNeuron = id + lChunck * maxNeurons ;
+  unsigned long int i;
+  double xa, xb;
+
+  if(id < maxNeurons & kNeuron < N_NEURONS) {    
+    xa = XCordinate(kNeuron,nbN,Cpt) ; // Mij column to row 
+    for(i=0; i < N_NEURONS; i++) { // i-->id column to row, P[row][clm] = G(X[row],X[clm],Sigma[clm]) 
+      if(whichPop(i) == 0 & whichPop(id) == 0) {
+	xb = XCordinate(i,nbN,Cpt) ;
+	dev_conVec[i + id * N_NEURONS ] = (float) K / (double) nbN[whichPop(i)] * ( 1.0 + 2.0 * Sigma[whichPop(i)] / sqrt(K) * cos( 2 * M_PI * (xa-xb) ) );
+      }
+      else
+	dev_conVec[i + id * N_NEURONS ] = (float) K / (double) nbN[whichPop(i)] ;
+    }
+  }
+}
+///////////////////////////////////////////////////////////////////    
+
 __global__ void KernelGenConProbMat(float *dev_conVec, int lChunck, int maxNeurons, int *nbN, int *Cpt, const double *Sigma) {
 
   unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x;
@@ -82,14 +103,12 @@ __global__ void KernelConProbNorm(float *dev_conVec, float *dev_preFactor, int l
   unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x; // each clm is a thread
   unsigned long int kNeuron = id + lChunck * maxNeurons;
   unsigned long int i;
-  double preFactor = 0 ; 
+  float preFactor = 0 ; 
   
   if(id < maxNeurons & kNeuron< N_NEURONS) { 
     for(i=0;i<N_NEURONS;i++) { // id-->i column to row, P[row][clm] = Zb[row] * C[row][clm]
-      // preFactor = dev_preFactor[i + whichPop(kNeuron) * N_NEURONS] ; 
-      // printf("id %llu i %llu  preF %.0f dev_conVec %.0f \n", id, i, dev_preFactor[i + whichPop(kNeuron) * N_NEURONS], dev_conVec[i + id * N_NEURONS]) ;
-      preFactor = K/dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
-      dev_conVec[i + id * N_NEURONS] *= (float) preFactor ; 
+      preFactor = K / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      dev_conVec[i + id * N_NEURONS] *= preFactor ; 
     }
   }
 }

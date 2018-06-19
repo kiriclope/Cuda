@@ -81,6 +81,24 @@ __global__ void initPreFactor(float *dev_preFactor) {
     dev_preFactor[i] = 0 ; 
 }
 
+__global__ void initIdPost(int *dev_IdPost) {
+  unsigned long int i;
+  for(i = 0; i < N_NEURONS ; i++) 
+    dev_IdPost[i] = 0 ; 
+}
+
+__global__ void initNbPost(int *dev_nbPost) {
+  unsigned long int i;
+  for(i = 0; i < N_NEURONS ; i++) 
+    dev_nbPost[i] = 0 ; 
+}
+
+__global__ void initNbPreS(int *dev_nbPreS) {
+  unsigned long int i;
+  for(i = 0; i < nbpop * nbpop ; i++) 
+    dev_nbPreS[i] = 0 ; 
+}
+
 __global__ void setup_kernel(curandState *state, unsigned long long seed ) {
   unsigned long int id = threadIdx.x + blockIdx.x * blockDim.x;
   /* Each thread gets different seed, a different sequence number, no offset */
@@ -118,21 +136,17 @@ __global__ void KernelGenDistDepConMat(curandState *state, float *dev_conVec, in
   /* indexing of matrix row + clm x N_NEURONS*/
   unsigned long int id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x;
   unsigned long int kNeuron = id + lChunck * maxNeurons, i;
-  
+
   if(id < maxNeurons & kNeuron < N_NEURONS)
     for(i=0; i<N_NEURONS; i++) 
       if(dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
-  	dev_conVec[id + i * maxNeurons] = 1 ;
+	dev_conVec[id + i * maxNeurons] = 1 ;
       else
-  	dev_conVec[id + i * maxNeurons] = 0 ; 
+	dev_conVec[id + i * maxNeurons] = 0 ; 
 }
 
 
 int main(int argc, char *argv[]) {
-
-  // int nbpop = (int) atoi(argv[1]) ; // number of neuronal populations
-  // int N = (int) atoi(argv[2]) ; // total number of neurons prefactor, Ntot = N*10000.
-  // double K = (double) atof(argv[3]) ;  // average number of connections
 
   int N = N_NEURONS ;
 
@@ -142,27 +156,12 @@ int main(int argc, char *argv[]) {
   
   // ///////////////////////////////////////////////////////////////////    
   
-  int nChunks = 1, deviceId = 0, maxNeurons = N_NEURONS;
-  float *dev_conVecPtr, *conVec = NULL, *dev_preFactor, *preFactor = NULL;
-  float *fullConVec = NULL ;
-  cudaDeviceProp prop;
-  unsigned long maxMem = 12079136768;
-
-  // ///////////////////////////////////////////////////////////////////    
-
-  enum ConMat_type {
-    random,distDependent
-  };
-
-  ConMat_type conMatType = random ; 
-  if(IF_SPACE) {
-    printf("Generating Spatial Matrix ... \n") ; 
-    conMatType = distDependent ;
-  }
-  else
-    printf("Generating Random Matrix ... \n") ; 
+  int nChunks = 1, deviceId = 0, maxNeurons = N_NEURONS ;
 
   ///////////////////////////////////////////////////////////////////
+
+  cudaDeviceProp prop;
+  unsigned long maxMem = 12079136768;
 
   cudaCheck(cudaGetDeviceProperties(&prop, deviceId));
   printf("Global Mem = %ld, ", prop.totalGlobalMem);
@@ -185,51 +184,16 @@ int main(int argc, char *argv[]) {
 
   printf(" maxNeurons = %d, nChunks = %d\n", maxNeurons, nChunks);
 
-  curandState *devStates;
-  
-  // printf("Declare fullConVec array ...");
-  fullConVec = (float *) malloc((unsigned long long) N_NEURONS * N_NEURONS * sizeof(float));
-  // printf(" Done\n");
-
-  if(fullConVec == NULL) {
-    printf("fullconvec not assigned\n"); 
-    exit(-1);
-  }
+  ///////////////////////////////////////////////////////////////////
 
   /* choose 256 threads per block for high occupancy */
-  int ThreadsPerBlock = 256;  
+  int ThreadsPerBlock = 512 ;
   int BlocksPerGrid = ( N_NEURONS + ThreadsPerBlock-1 ) / ThreadsPerBlock;
   
   if(BlocksPerGrid > 65536) {
     printf("BlocksPerGrid exceds valid number of allowed blocks of 65536");
     exit(-1);
   }
-  
-  ////////////////////////////////////////////////////////////////////    
-
-  // printf("Declare devstates array ...");
-  cudaCheck(cudaMalloc((void **)&devStates,  N_NEURONS * sizeof(curandState)));
-  // printf(" Done \n") ; 
-
-  // printf("Declare conVec array ...");
-  cudaCheck(cudaMallocHost((void **)&conVec, (N_NEURONS / nChunks) * N_NEURONS * sizeof(float)));
-  // printf(" Done \n") ;
-
-  // printf("Declare dev_conVecPtr array ...");
-  cudaCheck(cudaMalloc((void **)&dev_conVecPtr, (N_NEURONS / nChunks) * N_NEURONS * sizeof(float)));
-  // printf(" Done \n") ;
-
-  // printf("Declare dev_conVecPtr array ...");
-  cudaCheck(cudaMalloc((void **)&dev_preFactor, 2 * N_NEURONS * sizeof(float)));
-  // printf(" Done \n") ;
-
-  // printf("Declare dev_conVecPtr array ...");
-  cudaCheck(cudaMallocHost((void **)&preFactor, 2 * N_NEURONS * sizeof(float)));
-  // printf(" Done \n") ;
-    
-  printf("Setup kernel ... \n");
-  setup_kernel<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, time(NULL));
-  cudaCheckLastError("setup_kernel failed\n");
 
   ///////////////////////////////////////////////////////////////////
 
@@ -238,6 +202,78 @@ int main(int argc, char *argv[]) {
   BlocksPerGrid = (maxNeurons + ThreadsPerBlock - 1) / ThreadsPerBlock;
   printf("Threads per block : %d, Blocks per grid : %d \n", ThreadsPerBlock, BlocksPerGrid);
 
+  // ///////////////////////////////////////////////////////////////////    
+
+  float *dev_conVecPtr, *dev_preFactor ; //*preFactor = NULL;
+  float *fullConVec = NULL, *conVec = NULL ;
+
+  int *dev_IdPost, *dev_nbPost , *dev_nbPreSab ;
+  int *host_IdPost, *host_nbPost, *host_nbPreSab ;
+  int *IdPost, *nbPost ;
+
+  ///////////////////////////////////////////////////////////////////
+
+  curandState *devStates;
+  
+  fullConVec = (float *) malloc((unsigned long long) N_NEURONS * N_NEURONS * sizeof(float));
+
+  IdPost = (int *) malloc((unsigned long long)N_NEURONS * (2ULL + (unsigned long long)K + N_NEURONS) * sizeof(int));
+  nbPost = (int *) malloc((unsigned long long) N_NEURONS * sizeof(int));
+
+  int **nbPreSab = (int **)malloc(nbpop * sizeof(int *));
+  for(int i=0; i<nbpop; i++)
+    nbPreSab[i] = (int *) malloc(nbpop * sizeof(int));
+
+  for(int i=0; i<nbpop; i++)
+    for(int j=0;j<nbpop;j++)
+      nbPreSab[i][j] = 0 ;
+    
+  ////////////////////////////////////////////////////////////////////    
+
+  cudaCheck(cudaMalloc((void **)&devStates,  N_NEURONS * sizeof(curandState)));
+
+  cudaCheck(cudaMallocHost((void **)&conVec, (N_NEURONS / nChunks) * N_NEURONS * sizeof(float)));
+
+  cudaCheck(cudaMalloc((void **)&dev_conVecPtr, (N_NEURONS / nChunks) * N_NEURONS * sizeof(float)));
+
+  cudaCheck(cudaMalloc((void **)&dev_preFactor, 2 * N_NEURONS * sizeof(float)));
+
+  // cudaCheck(cudaMallocHost((void **)&preFactor, 2 * N_NEURONS * sizeof(float)));
+
+  cudaCheck(cudaMalloc((void **)&dev_IdPost,  N_NEURONS * sizeof(int)));
+
+  cudaCheck(cudaMalloc((void **)&dev_nbPost, N_NEURONS * sizeof(int)));
+
+  cudaCheck(cudaMalloc((void **)&dev_nbPreSab, nbpop * nbpop * sizeof(int)));
+
+  cudaCheck(cudaMallocHost((void **)&host_IdPost,  N_NEURONS * sizeof(int)));
+
+  cudaCheck(cudaMallocHost((void **)&host_nbPost, N_NEURONS * sizeof(int)));
+
+  cudaCheck(cudaMallocHost((void **)&host_nbPreSab, nbpop * nbpop * sizeof(int)));
+
+  ///////////////////////////////////////////////////////////////////
+
+  enum ConMat_type {
+    random,distDependent,bump
+  };
+
+  ConMat_type conMatType = random ; 
+  if(IF_SPACE) {
+    printf("Generating Spatial Matrix ... \n") ; 
+    conMatType = distDependent ;
+  }
+  else 
+    if(IF_BUMP)
+      printf("Generating Random Matrix with specific connections ... \n") ; 
+    else
+      printf("Generating Random Matrix ... \n") ; 
+      
+
+  printf("Setup kernel ... \n");
+  setup_kernel<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, time(NULL));
+  cudaCheckLastError("setup_kernel failed\n");
+
   ///////////////////////////////////////////////////////////////////
   
   double *host_Sigma ;
@@ -245,60 +281,97 @@ int main(int argc, char *argv[]) {
   for(int j=0;j<nbpop;j++) 
     host_Sigma[j] = Sigma[j] ;
   
-  if(IF_SPACE) {
+  if(IF_SPACE || IF_BUMP) {
     printf("Sigma ") ;
     for(int j=0;j<nbpop;j++) 
       printf("%.4f ",Sigma[j]) ;
     printf("\n") ;
   }
-            
+
+  int counter = 0 ;
+
   switch(conMatType) {
     
   case random:
     
     for(unsigned long long int i = 0; i < nChunks; i++) { 
       
-      printf("Generating chunk %llu ... ", i) ; fflush(stdout) ;
+      printf("Generating chunk %llu ... \n", i) ; fflush(stdout) ;
       
       initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
+      initIdPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_IdPost);
+      initNbPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPost);
+      initNbPreS<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPreSab);
 
-      printf("\n Generating Binary Matrix ...") ;
-      kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN); 
-      printf(" Done\n") ; 
-
-      printf("  Copy dev to Host ... ") ;
+      printf(" Generating Binary Matrix ...\n") ;
+      if(IF_BUMP) {
+	KernelGenConRing<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma); 
+	KernelGenDistDepConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons) ; 
+      }
+      else
+	kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN); 
+      
+      printf("  Copy dev to Host ... \n") ;
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
-      printf(" Done\n") ;
       
       for(unsigned long long int j = 0; j < chunckSize ; j++) 
 	fullConVec[j + chunckSize * i] = conVec[j] ; 
+
+      printf("   Generating Sparse Vectors ...\n") ;
+      GenSparseRep<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_IdPost, dev_nbPost, dev_nbPreSab, i, maxNeurons);
+
+      printf("    Copy dev to Host ... \n") ;
+      cudaCheck(cudaMemcpy(host_IdPost, dev_IdPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPost, dev_nbPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPreSab, dev_nbPreSab, nbpop * nbpop * sizeof(int), cudaMemcpyDeviceToHost)) ;
+
+
+      // for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
+      // 	if( host_IdPost[j] !=0 ) {
+      // 	  IdPost[counter] = host_IdPost[j] ; 
+      // 	  counter+=1 ;
+      // 	}
+      for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
+      	IdPost[j + chunckSize * i] = host_IdPost[j] ; 
+      
+      for(unsigned long int j = 0; j < N_NEURONS ;j++) {
+	nbPost[j] += host_nbPost[j] ; 
+	nbPreSab[whichPop(j)][0] += host_nbPost[j] ;
+      }
+
+      // for(int j=0;j<nbpop;j++)
+      // 	for(int k=0;k<nbpop;k++)
+      // 	  nbPreSab[j][k] += host_nbPreSab[j + nbpop * k] ;
     }
     
     break;
-      
+    
   case distDependent:
       
     initPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_preFactor);
     
     for(unsigned long long int i = 0; i < nChunks; i++) { 
-      
-      printf("Generating chunk %llu ... ", i); fflush(stdout);
-	
-      printf("\n Generating Probabilty Matrix ...");
-      KernelGenConProbMat<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma);      
-      printf(" Done\n") ; 
-      
-      printf("  Generating preFactor ...");
-      KernelConProbPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;      
-      printf(" Done\n") ; 
 
-      printf("   Copy dev to Host ...") ;
+      initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
+
+      initIdPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_IdPost);
+      initNbPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPost);
+      initNbPreS<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPreSab);
+
+      printf("Generating chunk %llu ... \n", i); fflush(stdout);
+	
+      printf(" Generating Probabilty Matrix ...\n");
+      KernelGenConProbMat<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma); 
+      
+      printf("  Generating preFactor ...\n");
+      KernelConProbPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;      
+
+      printf("   Copy dev to Host ...\n") ;
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
-      printf(" Done\n") ; 
 
       for(unsigned long long int j = 0; j < chunckSize ; j++) {
 	fullConVec[j + chunckSize * i] = conVec[j] ; 
-
+	
 	// if(conVec[j]!=1) {
 	//   printf("\n ERRROR Chunk %llu conVec[%llu] = %.3f \n", i, j, conVec[j] ) ;
 	//   exit(-1) ;
@@ -324,28 +397,44 @@ int main(int argc, char *argv[]) {
 
     for(unsigned long long int i = 0; i < nChunks; i++) { 
 
-      printf("Generating chunk %llu ... ", i); fflush(stdout);
+      printf("Generating chunk %llu ... \n", i); fflush(stdout);
       
       initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
 
       for(unsigned long long int j = 0; j < chunckSize ; j++) 
 	conVec[j] = fullConVec[j + chunckSize * i] ; 
 
-      printf("\n Copy Host to dev ...") ;
+      printf("\n Copy Host to dev ...\n") ;
       cudaCheck(cudaMemcpy(dev_conVecPtr, conVec, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyHostToDevice)) ;
-      printf(" Done\n") ; 
       
-      printf("  Generating Normalized Matrix ...") ;
+      printf("  Generating Normalized Matrix ...\n") ;
       KernelConProbNorm<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;
-      printf(" Done\n") ; 
             
-      printf("   Generating Binary Matrix ...") ;
+      printf("   Generating Binary Matrix ...\n") ;
       KernelGenDistDepConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons) ; 
-      printf(" Done\n") ; 
+            
+      printf("    Generating Sparse Vectors ...\n") ;
+      GenSparseRep<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_IdPost, dev_nbPost, dev_nbPreSab, i, maxNeurons);
+
+      printf("  Copy dev to Host ...\n") ;
+      cudaCheck(cudaMemcpy(host_IdPost, dev_IdPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPost, dev_nbPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPreSab, dev_nbPreSab, nbpop * nbpop * sizeof(int), cudaMemcpyDeviceToHost)) ;
+
+      for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
+	if(host_IdPost[j] !=0 ) {
+	  IdPost[counter] = host_IdPost[j] ; 
+	  counter+=1 ;
+	}
       
-      printf("    Copy dev to Host ...") ;
+      for(unsigned long int j = 0; j < N_NEURONS ;j++) 
+	nbPost[j] += host_nbPost[j] ; 
+
+      for(int j=0;j<nbpop;j++)
+	for(int k=0;k<nbpop;k++)
+	  nbPreSab[j][k] += host_nbPreSab[j + nbpop * k] ;
+
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS/ nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
-      printf(" Done\n") ; 
       
       for(unsigned long long int j = 0; j < chunckSize ; j++) {
 
@@ -361,6 +450,9 @@ int main(int argc, char *argv[]) {
     }
 
     break;    
+
+  case bump:
+    break ;
     
   default:
     for(unsigned long long int i = 0; i < nChunks; i++) 
@@ -370,65 +462,33 @@ int main(int argc, char *argv[]) {
   printf("Free devPtr ... ");
 
   cudaFree(dev_conVecPtr); 
-  cudaFree(dev_preFactor);  
+  cudaFree(dev_preFactor); 
+
+  cudaFree(dev_IdPost);  
+  cudaFree(dev_nbPost);
+  cudaFree(dev_nbPreSab);
 
   cudaFreeHost(host_Sigma); 
   cudaFreeHost(conVec); 
-  cudaFreeHost(preFactor); 
+
+  cudaFreeHost(host_IdPost);  
+  cudaFreeHost(host_nbPost);
+  cudaFreeHost(host_nbPreSab);
+  // // cudaFreeHost(preFactor); 
 
   printf("Done\n") ;
 
   ///////////////////////////////////////////////////////////////////    
 
-  ///////////////////////////////////////////////////////////////////    
-  // On CPU generate sparse representation
-  ///////////////////////////////////////////////////////////////////    
+  // ///////////////////////////////////////////////////////////////////    
+  // // On CPU 
+  // ///////////////////////////////////////////////////////////////////    
 
-  ///////////////////////////////////////////////////////////////////    
-  
-  printf("Generating sparse representation ... \n"); fflush(stdout);
-  
-  // printf("Declaring IdPost ... ");
-  int *IdPost ; // Id of the post neurons
-  IdPost = (int *) malloc((unsigned long long)N_NEURONS * (2ULL + (unsigned long long)K + N_NEURONS) * sizeof(int));
-  // printf("Done\n") ;
-
-  // printf("Declaring nbPost ... "); 
-  int *nbPost = (int *) malloc( N * sizeof(*nbPost) ) ; // number of post neurons
-  unsigned long int *idxPost = (unsigned long int *) malloc( N * sizeof(*idxPost)); // idx of the post neurons
-  unsigned long int counter = 0; 
-  // printf("Done\n") ;
-
-  // printf("Declaring nbPreSab ... ");
-  int **nbPreSab = (int **)malloc(nbpop * sizeof(int *));
-  for(int i=0; i<nbpop; i++)
-    nbPreSab[i] = (int *) malloc(nbpop * sizeof(int));
-  // printf("Done\n") ;
+  // ///////////////////////////////////////////////////////////////////    
     
+  unsigned long int *idxPost = (unsigned long int *) malloc( N * sizeof(unsigned long int) ); // idx of the post neurons 
   idxPost[0] = 0 ;
   
-  ///////////////////////////////////////////////////////////////////    
-  
-  printf("Generating vectors nbPost & IdPost ... ");
-
-  for(int i=0;i<nbpop;i++) 
-    for(int j=0;j<nbpop;j++) 
-      nbPreSab[j][i] = 0 ; 
-
-  for(int i=0;i<nbpop;i++) 
-    for(int k=Cpt[i];k<Cpt[i+1];k++) { //Presynaptic neurons
-      for(int j=0;j<nbpop;j++) 
-  	for(int l=Cpt[j];l<Cpt[j+1];l++) //Postsynaptic neurons
-  	  if(fullConVec[k + N_NEURONS * l]) { // k-->l column to row
-	    IdPost[counter] = l ;
-	    nbPost[k]++ ;
-	    nbPreSab[j][i]++ ;
-  	    counter+=1 ;
-  	  }   
-      // printf("PresId %d, nPost %d \r",k,nbPost[k]);
-    }
-  printf("Done\n") ;
-
   ///////////////////////////////////////////////////////////////////    
   // Average number of Presynaptic neurons
   ///////////////////////////////////////////////////////////////////    
@@ -444,23 +504,25 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////////////////////
 
   WritetoFile(path,N,IdPost,nbPost,idxPost) ;
+  CheckSparseVec(path,IdPost,nbPost,idxPost) ;
+
+  free(IdPost);
+  free(idxPost);
+  free(nbPost);
 
   ///////////////////////////////////////////////////////////////////    
   // Writing Complete Matrix
   ///////////////////////////////////////////////////////////////////
 
   if(IF_MATRIX)
-    WriteMatrix(path,N,IdPost,nbPost,idxPost) ;
+    WriteMatrix(path,fullConVec) ;
 
-  printf("Free Sparse Vectors ... ") ;
+  printf("Free Host ptr ... ") ;
 
   cudaFreeHost(nbN); 
   cudaFreeHost(Cpt); 
 
   free(fullConVec);
-  free(IdPost);
-  free(idxPost);
-  free(nbPost);
 
   printf("Done\n") ;
 
