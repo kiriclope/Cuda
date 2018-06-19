@@ -207,8 +207,8 @@ int main(int argc, char *argv[]) {
   float *dev_conVecPtr, *dev_preFactor ; //*preFactor = NULL;
   float *fullConVec = NULL, *conVec = NULL ;
 
-  // int *dev_IdPost, *dev_nbPost , *dev_nbPreSab ;
-  // int *host_IdPost, *host_nbPost, *host_nbPreSab ;
+  int *dev_IdPost, *dev_nbPost , *dev_nbPreSab ;
+  int *host_IdPost, *host_nbPost, *host_nbPreSab ;
   int *IdPost, *nbPost ;
 
   ///////////////////////////////////////////////////////////////////
@@ -238,19 +238,19 @@ int main(int argc, char *argv[]) {
 
   cudaCheck(cudaMalloc((void **)&dev_preFactor, 2 * N_NEURONS * sizeof(float)));
 
-  // cudaCheck(cudaMallocHost((void **)&preFactor, 2 * N_NEURONS * sizeof(float)));
+  cudaCheck(cudaMallocHost((void **)&preFactor, 2 * N_NEURONS * sizeof(float)));
 
-  // cudaCheck(cudaMalloc((void **)&dev_IdPost,  N_NEURONS * sizeof(int)));
+  cudaCheck(cudaMalloc((void **)&dev_IdPost,  N_NEURONS * sizeof(int)));
 
-  // cudaCheck(cudaMalloc((void **)&dev_nbPost, N_NEURONS * sizeof(int)));
+  cudaCheck(cudaMalloc((void **)&dev_nbPost, N_NEURONS * sizeof(int)));
 
-  // cudaCheck(cudaMalloc((void **)&dev_nbPreSab, nbpop * nbpop * sizeof(int)));
+  cudaCheck(cudaMalloc((void **)&dev_nbPreSab, nbpop * nbpop * sizeof(int)));
 
-  // cudaCheck(cudaMallocHost((void **)&host_IdPost,  N_NEURONS * sizeof(int)));
+  cudaCheck(cudaMallocHost((void **)&host_IdPost,  N_NEURONS * sizeof(int)));
 
-  // cudaCheck(cudaMallocHost((void **)&host_nbPost, N_NEURONS * sizeof(int)));
+  cudaCheck(cudaMallocHost((void **)&host_nbPost, N_NEURONS * sizeof(int)));
 
-  // cudaCheck(cudaMallocHost((void **)&host_nbPreSab, nbpop * nbpop * sizeof(int)));
+  cudaCheck(cudaMallocHost((void **)&host_nbPreSab, nbpop * nbpop * sizeof(int)));
 
   ///////////////////////////////////////////////////////////////////
 
@@ -298,9 +298,9 @@ int main(int argc, char *argv[]) {
       
       initConVec<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, maxNeurons);
 
-      // initIdPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_IdPost);
-      // initNbPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPost);
-      // initNbPreS<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPreSab);
+      initIdPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_IdPost);
+      initNbPost<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPost);
+      initNbPreS<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_nbPreSab);
 
       printf(" Generating Binary Matrix ...\n") ;
       if(IF_BUMP) {
@@ -316,28 +316,28 @@ int main(int argc, char *argv[]) {
       for(unsigned long long int j = 0; j < chunckSize ; j++) 
 	fullConVec[j + chunckSize * i] = conVec[j] ; 
 
-      // printf("   Generating Sparse Vectors ...\n") ;
-      // GenSparseRep<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_IdPost, dev_nbPost, dev_nbPreSab, i, maxNeurons);
+      printf("   Generating Sparse Vectors ...\n") ;
+      GenSparseRep<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_IdPost, dev_nbPost, dev_nbPreSab, i, maxNeurons);
 
-      // printf("    Copy dev to Host ... \n") ;
-      // cudaCheck(cudaMemcpy(host_IdPost, dev_IdPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
-      // cudaCheck(cudaMemcpy(host_nbPost, dev_nbPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
-      // cudaCheck(cudaMemcpy(host_nbPreSab, dev_nbPreSab, nbpop * nbpop * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      printf("    Copy dev to Host ... \n") ;
+      cudaCheck(cudaMemcpy(host_IdPost, dev_IdPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPost, dev_nbPost, N_NEURONS * sizeof(int), cudaMemcpyDeviceToHost)) ;
+      cudaCheck(cudaMemcpy(host_nbPreSab, dev_nbPreSab, nbpop * nbpop * sizeof(int), cudaMemcpyDeviceToHost)) ;
 
 
-      // // for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
-      // // 	if( host_IdPost[j] !=0 ) {
-      // // 	  IdPost[counter] = host_IdPost[j] ; 
-      // // 	  counter+=1 ;
-      // // 	}
-      
       // for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
-      // 	IdPost[j + chunckSize * i] = host_IdPost[j] ; 
+      // 	if( host_IdPost[j] !=0 ) {
+      // 	  IdPost[counter] = host_IdPost[j] ; 
+      // 	  counter+=1 ;
+      // 	}
       
-      // for(unsigned long int j = 0; j < N_NEURONS ;j++) {
-      // 	nbPost[j] += host_nbPost[j] ; 
-      // 	nbPreSab[whichPop(j)][0] += host_nbPost[j] ;
-      // }
+      for(unsigned long long int j = 0; j < N_NEURONS ; j++) 
+      	IdPost[j + chunckSize * i] = host_IdPost[j] ; 
+      
+      for(unsigned long int j = 0; j < N_NEURONS ;j++) {
+      	nbPost[j] += host_nbPost[j] ; 
+      	nbPreSab[whichPop(j)][0] += host_nbPost[j] ;
+      }
 
       // for(int j=0;j<nbpop;j++)
       // 	for(int k=0;k<nbpop;k++)
