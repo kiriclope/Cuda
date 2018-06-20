@@ -2,7 +2,7 @@
 #include "cuda_runtime_api.h"
 #include "mycurand.h"
 #include "librairies.h"
-
+#include "cuPrintf.cu"
 #include "devFunctionProtos.h"
 #include "devHostConstants.h"
 #include "Matrix_Utils.cu"
@@ -114,10 +114,11 @@ __global__ void kernelGenConMat(curandState *state, float *dev_conVec, int lChun
   unsigned long int i;
   
   if(id < maxNeurons && kNeuron < N_NEURONS) 
-    for(i=0; i<N_NEURONS; i++) // j is row and id is clmn 
-      if( K/(float) nbN[whichPop(i)] >= randkernel(state, kNeuron)) // neuron[id] receives input from j ?
-	dev_conVec[id + i * maxNeurons] = 1; 
-	
+    for(i=0; i<N_NEURONS; i++) {// j is row and id is clmn 
+      // cuPrintf("id %d i %d \n",id,i) ;
+      if( K/(float) nbN[whichPop(id)] >= randkernel(state, kNeuron)) // neuron[id] receives input from j
+	dev_conVec[i + id * N_NEURONS] = 1. ;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////    
@@ -133,9 +134,9 @@ __global__ void KernelGenConRing(curandState *state, float *dev_conVec, int lChu
     xa = XCordinate(kNeuron,nbN,Cpt) ; // Mij column to row 
     for(i=0; i < N_NEURONS; i++) { // i-->id column to row, P[row][clm] = G(X[row],X[clm],Sigma[clm]) 
       xb = XCordinate(i,nbN,Cpt) ;
-      dev_conVec[id + i * maxNeurons] = ( K / (float) (N_NEURONS/nbpop) ) ; // * ( 1.0 + 2.0 * Sigma[whichPop(kNeuron)] / sqrt(K) * cos( 2.0 * M_PI * (xa-xb) ) ) ;
+      dev_conVec[id + i * maxNeurons] = (float) ( K / (float) nbN[whichPop(i)] ) * ( 1.0 + 2.0 * Sigma[whichPop(kNeuron)] / sqrt(K) * cos( 2.0 * M_PI * (xa-xb) ) ) ;
       
-      if( dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) // neuron[id] receives input from j ?
+      if( dev_conVec[id + i * maxNeurons] >= randkernel(state,kNeuron)) // neuron[id] receives input from j ?
 	dev_conVec[id + i * maxNeurons] = 1; 
       else
 	dev_conVec[id + i * maxNeurons] = 0; 	
@@ -162,9 +163,9 @@ __global__ void KernelGenDistDepConMat(curandState *state, float *dev_conVec, in
   if(id < maxNeurons && kNeuron < N_NEURONS)
     for(i=0; i<N_NEURONS; i++) 
       if(dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
-	dev_conVec[id + i * maxNeurons] = 1 ;
+	dev_conVec[id + i * maxNeurons] = 1. ;
       else
-	dev_conVec[id + i * maxNeurons] = 0 ; 
+	dev_conVec[id + i * maxNeurons] = 0. ; 
 }
 
 
@@ -173,7 +174,7 @@ __global__ void KernelGenDistDepConMat(curandState *state, float *dev_conVec, in
 int main(int argc, char *argv[]) {
 
   int N = N_NEURONS ;
-
+  
   int *nbN, *Cpt ;
   nbNeurons(nbN);
   CptNeurons(nbN, Cpt);
@@ -219,6 +220,13 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
 
+  curandState *devStates;
+  cudaCheck(cudaMalloc((void **)&devStates,  N_NEURONS * sizeof(curandState)));
+  
+  printf("Setup kernel ... \n");
+  setup_kernel<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, time(NULL));
+  cudaCheckLastError("setup_kernel failed\n");
+
   ///////////////////////////////////////////////////////////////////
 
   unsigned long long int chunckSize = ( (unsigned long long) N_NEURONS / nChunks) * N_NEURONS ;
@@ -233,8 +241,6 @@ int main(int argc, char *argv[]) {
   int *IdPost, *nbPost ;
 
   ///////////////////////////////////////////////////////////////////
-
-  curandState *devStates;
   
   fullConVec = (float *) malloc((unsigned long long) N_NEURONS * N_NEURONS * sizeof(float));
 
@@ -250,8 +256,6 @@ int main(int argc, char *argv[]) {
       nbPreSab[i][j] = 0 ;
   
   ////////////////////////////////////////////////////////////////////    
-
-  cudaCheck(cudaMalloc((void **)&devStates,  N_NEURONS * sizeof(curandState)));
 
   cudaCheck(cudaMallocHost((void **)&conVec, (N_NEURONS / nChunks) * N_NEURONS * sizeof(float)));
 
@@ -277,12 +281,7 @@ int main(int argc, char *argv[]) {
       printf("Generating Random Matrix with specific connections ... \n") ; 
     else
       printf("Generating Random Matrix ... \n") ; 
-      
-
-  printf("Setup kernel ... \n");
-  setup_kernel<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, time(NULL));
-  cudaCheckLastError("setup_kernel failed\n");
-
+  
   ///////////////////////////////////////////////////////////////////
   
   double *host_Sigma ;
@@ -297,6 +296,8 @@ int main(int argc, char *argv[]) {
     printf("\n") ;
   }
 
+  cudaPrintfInit();
+
   switch(conMatType) {
     
   case random:
@@ -310,17 +311,22 @@ int main(int argc, char *argv[]) {
       printf(" Generating Binary Matrix ...\n") ;
       if(IF_BUMP) 
 	KernelGenConRing<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates,dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma) ; 
-      else
+      else {
 	kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN); 
+	cudaPrintfDisplay(stdout, true);
+      }
       
       printf("  Copy dev to Host ... \n") ;
       cudaCheck(cudaMemcpy(conVec, dev_conVecPtr, ( N_NEURONS / nChunks ) * N_NEURONS * sizeof(float), cudaMemcpyDeviceToHost)) ;
       
       for(unsigned long long int j = 0; j < chunckSize ; j++) {
-	fullConVec[j + chunckSize * i] = conVec[j] ; 
+	fullConVec[j + chunckSize * i] = (float) conVec[j] ; 
+	// printf("# %llu Con %f fullConVec %f \n", j + chunckSize * i, conVec[j], fullConVec[j + chunckSize * i]) ;
 	conVec[j] = 0 ;
       }
     }
+
+    cudaPrintfEnd();
 
     break;
     
