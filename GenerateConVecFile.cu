@@ -286,8 +286,8 @@ int main(int argc, char *argv[]) {
       for(int k=0;k<N_NEURONS;k++)
       	for(int j=0;j<maxNeurons;j++)
       	  if(conVec[k+j*maxNeurons]==0) {
-      	    printf("ERROR row %d clm %d conVec %.3f \n", k, j, conVec[k+j*maxNeurons]) ;
-	    exit(-1) ;
+      	    // printf("ERROR row %d clm %d conVec %.3f \n", k, j, conVec[k+j*maxNeurons]) ;
+	    // exit(-1) ;
 	  }
       
       KernelConProbPreFactor<<<BlocksPerGrid, ThreadsPerBlock>>>(dev_conVecPtr, dev_preFactor, i, maxNeurons) ;

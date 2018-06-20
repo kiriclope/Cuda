@@ -15,7 +15,7 @@
 const double Sigma[4] = {.5,.25,.25,.25} ;
 
 #define IF_Nk 0
-#define IF_SPACE 1
-#define IF_MATRIX 1
+#define IF_SPACE 0
+#define IF_MATRIX 0
 
 #endif
