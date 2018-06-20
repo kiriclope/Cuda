@@ -48,10 +48,10 @@ __host__ void CreatePath(char *&path,int N) {
     sprintf(strCrec,"CrecE%.4fCrecI%.4fCrecS%.4fCrecX%.4f",Sigma[0],Sigma[1],Sigma[2],Sigma[3]);
   
   if(IF_BUMP) 
-    sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (nbpop), K, strCrec) ;
+    sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
   else
     if(IF_SPACE) 
-      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (nbpop), K, strCrec) ; 
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
     else 
       sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (nbpop), K) ;
   
@@ -128,7 +128,7 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
   strcat(Idpath,strIdPost) ;
 
   unsigned long int nbCon = 0;
-  for(int i = 0; i < N_NEURONS; i++) 
+  for(unsigned long int i = 0; i < N_NEURONS; i++) 
     nbCon += nbPost[i];
   
   FILE *fIdPost, *fnbPost, *fidxPost ;
@@ -145,7 +145,7 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
 
   printf("%s\n",Idpath) ;
 
-  for(int i=1;i<N;i++)
+  for(unsigned long int i=1;i<N_NEURONS;i++)
     idxPost[i] = idxPost[i-1] + nbPost[i-1] ;
 
   for(int i=0;i<10;i++)

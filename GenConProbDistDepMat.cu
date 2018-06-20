@@ -9,7 +9,6 @@
 __device__ double XCordinate(unsigned long int neuronIdx, int *nbN, int *Cpt) { 
   double X = 0 ;
   int i = whichPop(neuronIdx) ;
-
   X = fmod( (double) (neuronIdx-Cpt[i]), (double) nbN[i] ) * L / ( (double) nbN[i] - 1.0 )  ;
 
   return X ;
@@ -45,27 +44,6 @@ __device__ double ConProb(double xa, double xb, double patchSize, double varianc
   return Gaussian1D(distX, varianceOfGaussian);
 }
 
-///////////////////////////////////////////////////////////////////    
-
-__global__ void KernelGenConRing(float *dev_conVec, int lChunck, int maxNeurons, int *nbN, int *Cpt, const double *Sigma) {
-
-  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned long int kNeuron = id + lChunck * maxNeurons ;
-  unsigned long int i;
-  double xa, xb;
-
-  if(id < maxNeurons & kNeuron < N_NEURONS) {    
-    xa = XCordinate(kNeuron,nbN,Cpt) ; // Mij column to row 
-    for(i=0; i < N_NEURONS; i++) { // i-->id column to row, P[row][clm] = G(X[row],X[clm],Sigma[clm]) 
-      if(whichPop(i) == 0 & whichPop(id) == 0) {
-	xb = XCordinate(i,nbN,Cpt) ;
-	dev_conVec[i + id * N_NEURONS ] = (float) K / (double) nbN[whichPop(i)] * ( 1.0 + 2.0 * Sigma[whichPop(i)] / sqrt(K) * cos( 2 * M_PI * (xa-xb) ) );
-      }
-      else
-	dev_conVec[i + id * N_NEURONS ] = (float) K / (double) nbN[whichPop(i)] ;
-    }
-  }
-}
 ///////////////////////////////////////////////////////////////////    
 
 __global__ void KernelGenConProbMat(float *dev_conVec, int lChunck, int maxNeurons, int *nbN, int *Cpt, const double *Sigma) {
