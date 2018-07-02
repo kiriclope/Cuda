@@ -45,13 +45,19 @@ __host__ void CreatePath(char *&path,int N) {
   if(nbpop==3) 
     sprintf(strCrec,"CrecE%.4fCrecI%.4fCrecS%.4f",Sigma[0],Sigma[1],Sigma[2]);
   if(nbpop==4) 
-    sprintf(strCrec,"CrecE%.4fCrecI%.4fCrecS%.4fCrecX%.4f",Sigma[0],Sigma[1],Sigma[2],Sigma[3]);
+    sprintf(strCrec,"CrecE%.4fCrecI%.4fCrecS%.4fCrecV%.4f",Sigma[0],Sigma[1],Sigma[2],Sigma[3]);
   
-  if(IF_BUMP) 
-    sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
+  if(IF_RING) 
+    if(IF_SPEC)
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/Spec/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
+    else
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
   else
     if(IF_SPACE) 
-      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
+      if(IF_SPEC)
+	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/Spec/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
+      else
+	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
     else 
       sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (nbpop), K) ;
   
@@ -115,6 +121,12 @@ __host__ void WritetoFile(char *path, int N, int *IdPost, int *nbPost, unsigned 
   const char *stridxPost = "/idxPost.dat";
   const char *strnbPost = "/nbPost.dat"; 
 
+  if(IF_Nk) {
+    strIdPost = "/IdPost_Nk.dat";
+    stridxPost = "/idxPost_Nk.dat";
+    strnbPost = "/nbPost_Nk.dat"; 
+  }
+  
   nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
   idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
   Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost) + 100 ) ;

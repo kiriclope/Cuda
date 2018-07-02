@@ -116,8 +116,10 @@ __global__ void kernelGenConMat(curandState *state, float *dev_conVec, int lChun
   if(id < maxNeurons && kNeuron < N_NEURONS) 
     for(i=0; i<N_NEURONS; i++) {// j is row and id is clmn 
       // cuPrintf("id %d i %d \n",id,i) ;
-      if( K/(float) nbN[whichPop(id)] >= randkernel(state, kNeuron)) // neuron[id] receives input from j
-	dev_conVec[i + id * N_NEURONS] = 1. ;
+      if( K/(float) nbN[whichPop(kNeuron)] >= randkernel(state, kNeuron)) // neuron[id] receives input from j
+	dev_conVec[id + i * maxNeurons] = 1 ;
+      else
+	dev_conVec[id + i * maxNeurons] = 0 ;
     }
 }
 
@@ -134,19 +136,12 @@ __global__ void KernelGenConRing(curandState *state, float *dev_conVec, int lChu
     xa = XCordinate(kNeuron,nbN,Cpt) ; // Mij column to row 
     for(i=0; i < N_NEURONS; i++) { // i-->id column to row, P[row][clm] = G(X[row],X[clm],Sigma[clm]) 
       xb = XCordinate(i,nbN,Cpt) ;
-      dev_conVec[id + i * maxNeurons] = (float) ( K / (float) nbN[whichPop(i)] ) * ( 1.0 + 2.0 * Sigma[whichPop(kNeuron)] / sqrt(K) * cos( 2.0 * M_PI * (xa-xb) ) ) ;
+      dev_conVec[id + i * maxNeurons] = (float) ( K / (float) nbN[whichPop(i)] ) * ( 1.0 + 2.0 * Sigma[whichPop(i)] * Sigma[whichPop(kNeuron)] / sqrt(K) * cos( 2.0 * M_PI * (xa-xb) ) ) ;
       
       if( dev_conVec[id + i * maxNeurons] >= randkernel(state,kNeuron)) // neuron[id] receives input from j ?
 	dev_conVec[id + i * maxNeurons] = 1; 
       else
 	dev_conVec[id + i * maxNeurons] = 0; 	
-      
-      // if(whichPop(id) == 0) {
-      // 	xb = XCordinate(i,nbN,Cpt) ;
-      // 	dev_conVec[i + id * N_NEURONS] = (float) K / (float) nbN[whichPop(id)] * ( 1.0 + 2.0 * Sigma[whichPop(id)] / sqrt(K) * cos( 2 * M_PI * (xa-xb) ) ) ;
-      // }
-      // else 
-      // 	dev_conVec[i + id * N_NEURONS] = (float) K / (float) nbN[whichPop(id)] ;
       
     }
   }
@@ -162,10 +157,28 @@ __global__ void KernelGenDistDepConMat(curandState *state, float *dev_conVec, in
 
   if(id < maxNeurons && kNeuron < N_NEURONS)
     for(i=0; i<N_NEURONS; i++) 
-      if(dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
-	dev_conVec[id + i * maxNeurons] = 1. ;
+
+      if(IF_SPEC) 
+	
+	if(true)
+
+	  if( ( K -sqrt(K) ) / (float) ( N_NEURONS/nbpop ) + dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
+	    dev_conVec[id + i * maxNeurons] = 1. ;
+	  else
+	    dev_conVec[id + i * maxNeurons] = 0. ; 
+
+	else
+	  if( K  / (float) ( N_NEURONS/nbpop ) >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
+	    dev_conVec[id + i * maxNeurons] = 1. ;
+	  else
+	    dev_conVec[id + i * maxNeurons] = 0. ;  
+  
       else
-	dev_conVec[id + i * maxNeurons] = 0. ; 
+
+	if(dev_conVec[id + i * maxNeurons] >= randkernel(state, kNeuron)) /* neuron[id] receives input from i ? */
+	  dev_conVec[id + i * maxNeurons] = 1. ;
+	else
+	  dev_conVec[id + i * maxNeurons] = 0. ; 
 }
 
 
@@ -176,8 +189,8 @@ int main(int argc, char *argv[]) {
   int N = N_NEURONS ;
   
   int *nbN, *Cpt ;
-  nbNeurons(nbN);
-  CptNeurons(nbN, Cpt);
+  nbNeurons(nbN) ;
+  CptNeurons(nbN, Cpt) ;
   
   // ///////////////////////////////////////////////////////////////////    
   
@@ -212,7 +225,7 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////////////////////
 
   /* choose 256 threads per block for high occupancy */
-  int ThreadsPerBlock = 512 ;
+  int ThreadsPerBlock = N_THREADS ;
   int BlocksPerGrid = ( N_NEURONS + ThreadsPerBlock-1 ) / ThreadsPerBlock;
   
   if(BlocksPerGrid > 65536) {
@@ -277,10 +290,13 @@ int main(int argc, char *argv[]) {
     conMatType = distDependent ;
   }
   else 
-    if(IF_BUMP)
-      printf("Generating Random Matrix with specific connections ... \n") ; 
-    else
+    if(IF_RING) 
+      printf("Generating Ring ... \n") ; 
+    else 
       printf("Generating Random Matrix ... \n") ; 
+  
+  if(IF_SPEC) 
+    printf("with specific connections ... \n") ; 
   
   ///////////////////////////////////////////////////////////////////
   
@@ -289,7 +305,7 @@ int main(int argc, char *argv[]) {
   for(int j=0;j<nbpop;j++) 
     host_Sigma[j] = Sigma[j] ;
   
-  if(IF_SPACE || IF_BUMP) {
+  if(IF_SPACE || IF_RING) {
     printf("Sigma ") ;
     for(int j=0;j<nbpop;j++) 
       printf("%.4f ",Sigma[j]) ;
@@ -309,7 +325,7 @@ int main(int argc, char *argv[]) {
       printf("Generating chunk %llu ... \n", i) ; fflush(stdout) ;
       
       printf(" Generating Binary Matrix ...\n") ;
-      if(IF_BUMP) 
+      if(IF_RING) 
 	KernelGenConRing<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates,dev_conVecPtr,i,maxNeurons,nbN,Cpt,host_Sigma) ; 
       else {
 	kernelGenConMat<<<BlocksPerGrid, ThreadsPerBlock>>>(devStates, dev_conVecPtr, i, maxNeurons, nbN); 

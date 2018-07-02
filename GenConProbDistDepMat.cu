@@ -85,7 +85,12 @@ __global__ void KernelConProbNorm(float *dev_conVec, float *dev_preFactor, int l
   
   if(id < maxNeurons & kNeuron< N_NEURONS) { 
     for(i=0;i<N_NEURONS;i++) { // id-->i column to row, P[row][clm] = Zb[row] * C[row][clm]
-      preFactor = K / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      
+      if(IF_SPEC)
+	preFactor =  sqrt(K) / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      else
+	preFactor = K / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+
       dev_conVec[i + id * N_NEURONS] *= preFactor ; 
     }
   }
