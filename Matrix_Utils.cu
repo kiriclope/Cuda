@@ -13,6 +13,7 @@ __host__ __device__ int whichPop(unsigned long int neuronIdx) {
   while( neuronIdx > propPop-1 ) {
     popIdx++ ;
     propPop += ( N_NEURONS * (100 - int( popSize * 100 ) ) / 100 ) / max( (nbpop-1), 1 ) ;
+    // propPop += int( N_NEURONS * ( 1. - popSize ) ) / max( (nbpop-1), 1 ) ;
   }
   return popIdx ;
 }
@@ -49,17 +50,17 @@ __host__ void CreatePath(char *&path,int N) {
   
   if(IF_RING) 
     if(IF_SPEC)
-      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/Spec/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/Spec/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ;
     else
-      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ;
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Ring/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ;
   else
     if(IF_SPACE) 
       if(IF_SPEC)
-	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/Spec/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
+	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/Spec/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ; 
       else
-	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/10000), K, strCrec) ; 
+	sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ; 
     else 
-      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (nbpop), K) ;
+      sprintf(cdum, "../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (N_NEURONS/nbPref), K) ;
   
   path = (char *) malloc( strlen(cdum) + 100) ;
   strcpy(path,cdum) ;
@@ -269,10 +270,10 @@ __host__ void CheckSparseVec(char * path) {
   FILE *Out;
   Out = fopen(pathMatrix,"wb");
   
-  int **M ;
-  M = new int*[N_NEURONS] ;
+  float **M ;
+  M = new float*[N_NEURONS] ;
   for(int i=0;i<N_NEURONS;i++) 
-    M[i] = new int[N_NEURONS]() ;
+    M[i] = new float[N_NEURONS]() ;
 
   for(int i=1;i<N_NEURONS;i++)
     idxPost[i] = idxPost[i-1] + nbPost[i-1] ;

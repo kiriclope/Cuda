@@ -17,7 +17,14 @@ __device__ double XCordinate(unsigned long int neuronIdx, int *nbN, int *Cpt) {
 ///////////////////////////////////////////////////////////////////    
 
 __device__ double Gaussian1D(double mu, double sigma) {
-  return exp(-mu*mu/2./sigma/sigma)/sqrt(2.*M_PI)/sigma ;
+  if(sigma!=0.)
+    return exp(-mu*mu/2./sigma/sigma)/sqrt(2.*M_PI)/sigma ;
+  else
+    return 1. ;
+    // if(mu==0.)
+    //   return 1. ;
+    // else
+    //   return 0. ;
 }
 
 ///////////////////////////////////////////////////////////////////    
@@ -25,7 +32,7 @@ __device__ double Gaussian1D(double mu, double sigma) {
 __device__ double ShortestDistOnCirc(double point0, double point1, double perimeter) {
   double dist = 0.0;
   dist = abs(point0 - point1);
-  dist = fmod(dist, perimeter);
+  dist = fmod(dist, perimeter) ;
   if(dist > 0.5*L){
     dist = L*(1.0 - dist);
   }
@@ -86,11 +93,14 @@ __global__ void KernelConProbNorm(float *dev_conVec, float *dev_preFactor, int l
   if(id < maxNeurons & kNeuron< N_NEURONS) { 
     for(i=0;i<N_NEURONS;i++) { // id-->i column to row, P[row][clm] = Zb[row] * C[row][clm]
       
-      if(IF_SPEC)
-	preFactor =  sqrt(K) / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      if(IF_SPEC) {
+	if(dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] !=0)
+	  preFactor =  sqrt(K) / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      }
       else
-	preFactor = K / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
-
+	if(dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] !=0)
+	  preFactor = K / dev_preFactor[kNeuron + whichPop(i) * N_NEURONS] ; 
+      
       dev_conVec[i + id * N_NEURONS] *= preFactor ; 
     }
   }

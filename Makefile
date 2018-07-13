@@ -7,6 +7,6 @@ debug : GenerateConVecFile.cu
 	nvcc -arch=sm_35 -g -G -lineinfo $<
 
 clean:
-	-rm *.o *.out
+	-rm *.out
 
 .PHONY: clean
