@@ -107,11 +107,16 @@ __host__ int dirExists(const char *path) {
 
 __host__ void CreatePath(char *&path) {
   
-  char *mkdirp ;   
-  char cdum[500] ;
-  char strCrec[100] ;
 
-  char strAuta[100] ;
+  char* cdum ;
+  cdum = (char *) malloc(100 * sizeof(char) ) ;
+
+  char* strCrec ;
+  strCrec = (char *) malloc(100 * sizeof(char)) ;
+
+  char* strAuta ;
+  strAuta = (char *) malloc(100 * sizeof(char)) ;
+
   switch(AUTA_Pop) {
   case 0 :
     if(nbpop>1)
@@ -159,32 +164,36 @@ __host__ void CreatePath(char *&path) {
 	    sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f/Gauss/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ;  
 	  else
 	    sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f/Gauss2D/%s", nbpop, (int) (N_NEURONS/nbPref), K, strCrec) ;  
-    else {
+    else 
       if(IF_LARGE)
 	sprintf(cdum, "../../Connectivity/%dpop/Large/N%d/K%.0f", nbpop, (int) (N_NEURONS/nbPref), K) ;
       else 
 	if(IF_AUTA)
 	  sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f/%s", nbpop, (int) (N_NEURONS/nbPref), K, strAuta) ; 
 	else
-	  sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (N_NEURONS/nbPref), K) ;
-    }
-
-  path = (char *) malloc( strlen(cdum) + 100) ;
+	  if(IF_SHARED)
+	    sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f/Shared%.2f/Cluster%.2f", nbpop, (int) (N_NEURONS/nbPref), K, PROP_SHARED, CLUSTER_SIZE) ;
+	  else
+	    sprintf(cdum, "../../Connectivity/%dpop/N%d/K%.0f", nbpop, (int) (N_NEURONS/nbPref), K) ; 
+  
+  
+  path = (char *) malloc( (strlen(cdum) + 100) * sizeof(char) ) ;
   strcpy(path,cdum) ;
 
-  mkdirp = (char *) malloc(strlen(path)+100);
+  char *mkdirp ;   
+  mkdirp = (char *) malloc( (strlen(path) + 100) * sizeof(char) );
   
-  strcpy(mkdirp,"mkdir -p ") ;
+  strcpy(mkdirp,"mkdir -p ") ; 
   strcat(mkdirp,path) ; 
-  // printf("%s\n",mkdirp) ;
+  printf("%s\n",mkdirp) ;
 
-  const int dir_err = system(mkdirp);
-  // printf("%d\n",dir_err) ;
+  const int dir_err = system(mkdirp) ; 
+  printf("%d\n",dir_err) ;
 
   if(-1 == dir_err) {
     printf("error creating directory : ");
   }
-  else {
+  else { 
     printf("Created directory : ") ;
   }
   printf("%s\n",path) ;
@@ -194,8 +203,8 @@ __host__ void CreatePath(char *&path) {
 
 __host__ void CheckPres(char *path, unsigned long* Cpt, unsigned long *IdPost, int *nbPost, int **nbPreSab) {
 
-  for(unsigned long k=0;k<N_NEURONS;k++) 
-    nbPreSab[ whichPop(k) ][ whichPop( IdPost[k] ) ] += nbPost[k] ;
+  // for(unsigned long k=0;k<N_NEURONS;k++) 
+  //   nbPreSab[ whichPop(k) ][ whichPop( IdPost[k] ) ] += nbPost[k] ;
   
   printf("\nAverage nbPreS : ");
 
@@ -206,7 +215,7 @@ __host__ void CheckPres(char *path, unsigned long* Cpt, unsigned long *IdPost, i
     str ="/nbPreSab.txt" ;
 
   char *strPreSab ;
-  strPreSab =  (char *) malloc( strlen(path) + strlen(str) + 100) ;
+  strPreSab =  (char *) malloc( (strlen(path) + strlen(str) + 100 ) * sizeof(char) ) ;
 
   strcpy(strPreSab,path) ;
   strcat(strPreSab,str) ;
@@ -244,9 +253,9 @@ __host__ void WritetoFile(char *path, unsigned long int *IdPost, int *nbPost, un
     strnbPost = "/nbPost_Nk.dat"; 
   }
   
-  nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
-  idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
-  Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost) + 100 ) ;
+  nbpath =  (char *) malloc( (strlen(path)+strlen(strnbPost) + 100) * sizeof(char) ) ;
+  idxpath = (char *) malloc( (strlen(path)+strlen(stridxPost) + 100) * sizeof(char) ) ;
+  Idpath = (char *)  malloc( (strlen(path)+strlen(strIdPost) + 100 ) * sizeof(char) ) ;
 
   strcpy(nbpath,path) ;
   strcpy(idxpath,path) ;
@@ -325,9 +334,9 @@ __host__ void WritetoFileLarge(char *path, unsigned long int *IdPost, int *nbPos
     sprintf(strnbPost, "/nbPost_%s.dat", AtoB);
   }
 
-  nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
-  idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
-  Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost) + 100 ) ;
+  nbpath =  (char *) malloc( ( strlen(path)+strlen(strnbPost) + 100 ) * sizeof(char) );
+  idxpath = (char *) malloc( (strlen(path)+strlen(stridxPost) + 100 ) * sizeof(char) );
+  Idpath = (char *)  malloc( (strlen(path)+strlen(strIdPost) + 100 ) * sizeof(char) );
 
   strcpy(nbpath,path) ;
   strcpy(idxpath,path) ;
@@ -385,10 +394,10 @@ __host__ void WritetoFileLarge(char *path, unsigned long int *IdPost, int *nbPos
 
 __host__ void WriteMatrix(char *path, float *conVec) {
 
-  printf("Writing Cij Matrix to : \n") ;
-  const char* strMatrix = "/Cij_Matrix.dat";
-  char *pathMatrix ;
-  pathMatrix = (char *) malloc(strlen(path)+strlen(strMatrix)+10) ;
+  printf("Writing Cij Matrix to : \n") ;   
+  const char* strMatrix = "/Cij_Matrix.dat"; 
+  char *pathMatrix ; 
+  pathMatrix = (char *) malloc( (strlen(path)+strlen(strMatrix)+100) * sizeof(char) ) ;
 
   strcpy(pathMatrix,path) ;
   strcat(pathMatrix,strMatrix) ;
@@ -405,15 +414,15 @@ __host__ void CheckSparseVec(char * path) {
 
   char *nbpath  ;
   char *idxpath ;
-  char  *Idpath ;
+  char *Idpath ;
 
   const char *strIdPost = "/IdPost.dat";
   const char *stridxPost = "/idxPost.dat";
   const char *strnbPost = "/nbPost.dat"; 
 
-  nbpath =  (char *) malloc(strlen(path)+strlen(strnbPost) + 100 ) ;
-  idxpath = (char *) malloc(strlen(path)+strlen(stridxPost) + 100 ) ;
-  Idpath = (char *)  malloc(strlen(path)+strlen(strIdPost) + 100 ) ;
+  nbpath =  (char *) malloc( (strlen(path)+strlen(strnbPost) + 100 ) * sizeof(char) ) ;
+  idxpath = (char *) malloc( (strlen(path)+strlen(stridxPost) + 100 ) * sizeof(char) ) ;
+  Idpath = (char *)  malloc( (strlen(path)+strlen(strIdPost) + 100 ) * sizeof(char) ) ;
   
   strcpy(nbpath,path) ;
   strcpy(idxpath,path) ;
@@ -455,7 +464,7 @@ __host__ void CheckSparseVec(char * path) {
   printf("Writing Cij Matrix to : \n") ;
   const char* strMatrix = "/Cij_Matrix.dat";
   char *pathMatrix ;
-  pathMatrix = (char *) malloc(strlen(path)+strlen(strMatrix)+10) ;
+  pathMatrix = (char *) malloc( (strlen(path)+strlen(strMatrix)+100) * sizeof(char) ) ;
 
   strcpy(pathMatrix,path) ;
   strcat(pathMatrix,strMatrix) ;
@@ -513,21 +522,73 @@ __global__ void kernelGenSparseRep(float *dev_conVec, unsigned long *dev_IdPost,
 
 __global__ void kernelGenConMat(curandState *state, float *dev_conVec, int lChunck, unsigned long int maxNeurons, unsigned long int* nbN) { 
 
-  /* indexing of matrix row + clm x N_NEURONS*/
+  /* indexing of matrix row + clm x N_NEURONS*/ 
   unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x ; 
   unsigned long int kNeuron = id + lChunck * maxNeurons ; 
-  unsigned long int i;
+  unsigned long int i ;
   
   if(id < maxNeurons && kNeuron < N_NEURONS) 
     for(i=0; i<N_NEURONS; i++) { // i is row and id is clmn 
       // cuPrintf("id %d i %d \n",id,i) ;     
       if( (float) ( K ) / (float) ( nbN[whichPop(kNeuron)] ) >= randkernel(state, kNeuron) ) // neuron[id] receives input from i 
-	dev_conVec[id + i * maxNeurons] = 1 ; 
+    	dev_conVec[i + id * N_NEURONS] = 1 ; 
       else 
-	dev_conVec[id + i * maxNeurons] = 0 ; 
+    	dev_conVec[i + id * N_NEURONS] = 0 ;  
     }
 }
 
+///////////////////////////////////////////////////////////////////    
+
+__global__ void kernelGenConMatShared(curandState *state, float *dev_conVec, int lChunck, unsigned long int maxNeurons, unsigned long int* nbN) { 
+
+  /* indexing of matrix row + clm x N_NEURONS*/ 
+  unsigned long id =  (unsigned long int)threadIdx.x + blockIdx.x * blockDim.x ; 
+  unsigned long int kNeuron = id + lChunck * maxNeurons ; 
+  unsigned long int i;
+  int j=0 ;
+
+  if(id < maxNeurons && kNeuron < N_NEURONS ) {
+
+    if(whichPop(kNeuron)==0) {
+
+      for(i=0; i<N_NEURONS/nbpop; i++) { // i is row and id is clmn 
+	if( (float) ( K ) / (float) ( nbN[whichPop(kNeuron)] ) >= randkernel(state, kNeuron) ) // neuron[id] receives input from i 
+	  dev_conVec[i + id * N_NEURONS] = 1 ; 
+	else 
+	  dev_conVec[i + id * N_NEURONS] = 0 ; 
+      }
+      
+      if(kNeuron< CLUSTER_SIZE * N_NEURONS / nbpop ) { // CLUSTER projecting mostly to SOM	
+	for(j=0;j<nbpop-1;j++)
+	  for(i=(j+1)*N_NEURONS/nbpop; i<(j+2)*N_NEURONS/nbpop; i++) { // i is row and id is clmn 
+	    if( (float) ( j - (2.0*j-1.0) * PROP_SHARED )* K / (float) ( CLUSTER_SIZE * nbN[whichPop(kNeuron)] ) >= randkernel(state, kNeuron) ) // neuron[id] receives input from i 
+	      dev_conVec[id + i * maxNeurons] = 1 ; 
+	    else 
+	      dev_conVec[id + i * maxNeurons] = 0 ; 
+	  }
+      }
+
+      if(kNeuron>= CLUSTER_SIZE * N_NEURONS / nbpop && nbpop>2) {
+	for(j=0;j<nbpop-1;j++)
+	  for(i=(j+1)*N_NEURONS/nbpop; i<(j+2)*N_NEURONS/nbpop; i++) { // i is row and id is clmn 
+	    if( (float)  ( ( j - (2.0*j-1.0) * (1.0-PROP_SHARED) )* K ) / (float) ( (1.0 - CLUSTER_SIZE) * nbN[whichPop(kNeuron)] ) >= randkernel(state, kNeuron) ) // neuron[id] receives input from i 
+	      dev_conVec[id + i * maxNeurons] = 1 ; 
+	    else 
+	      dev_conVec[id + i * maxNeurons] = 0 ; 
+	  }
+      }
+      
+    }
+    else
+      for(i=0; i<N_NEURONS; i++) { // i is row and id is clmn 
+	if( (float) ( K ) / (float) ( nbN[whichPop(kNeuron)] ) >= randkernel(state, kNeuron) ) // neuron[id] receives input from i 
+	  dev_conVec[id + i * maxNeurons] = 1 ; 
+	else 
+	  dev_conVec[id + i * maxNeurons] = 0 ; 
+      }    
+  }
+  
+}
 ///////////////////////////////////////////////////////////////////    
 
 __global__ void kernelGenConAuta(curandState *state, float *dev_conVec, int lChunck, unsigned long int maxNeurons, unsigned long int* nbN, const double *AUTA_p) {
@@ -551,6 +612,7 @@ __global__ void kernelGenConAuta(curandState *state, float *dev_conVec, int lChu
 	  dev_conVec[id + i * maxNeurons] = 1 ; 
 	else 
 	  dev_conVec[id + i * maxNeurons] = 0 ; 
+
     }
 }
 
